@@ -43,19 +43,52 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         bool fIsInitialDownload = IsInitialBlockDownload();
         if(fIsInitialDownload) return;
 
-        CTxIn vin;
-        CService addr;
+        /*
+        Listing a masternode involves a long chain of things that must happen securely and efficiently.
+
+        When a masternode is formed, a transaction is sent to an address, this "target masternode address"
+         is listed as the pubkey, however, the "CTxIn vin" is actually the transaction that it happened in,
+         or where the money came from.
+        */
+
+        CTxIn vin;              // input transaction to masternode tx
+        CService addr;          // masternode address for receiving communication
+        //- Masternode addr is not unique and multiple masternodes can be setup per address if done carefully.
+        //   In future versions, masternodes will have to respond to "challenge requests" by other masternodes in
+        //   order to continue to get paid. Challenge requests are when another master will submit a token to sign
+        //   with pubkey2 (which only the masternode knows), therefore confirming it is the node it says it is.
+        //  This stops IP hyjacking, where a masternode doesn't even run a daemon, but gets paid anyway.
+        //   TLDR, IPs must not be forced to be unique, maybe eventually.
+
         CPubKey pubkey;
+        /*This is the destination pubkey of the transaction.
+        For example, http://explorer.darkcoin.io/tx/ff081b33c986999f4726e06cde07209033b724edc29dbbcf2314b244f5fa93ab,
+        this transaction spawned 11 masternodes. So if you wanted to start "XmUFn9VSW6ef79JDjxQFygA9jj1yngJ2Wa" you must
+        sign a message using that specific key.
+        */
+
         CPubKey pubkey2;
-        vector<unsigned char> vchSig;
-        int64_t sigTime;
+        /*For hot/cold masternodes to work, we need a new shared key. This really should be refered to as the "shared key"
+        in the code, not pubkey2 . */
+
+        vector<unsigned char> vchSig; // the signature from the address that holds the money
+
+        int64_t sigTime; //time of the signature
         int count;
         int current;
+        //- these are used for dseg messages, which a client requests the full list
+
         int64_t lastUpdated;
+        //- this is the last time a dseep message was received.
+
         int protocolVersion;
-        std::string strMessage;
+        //- Protocol version is very important, it specifies the compatability of a masternode to the network and can determine
+        // if the masternode will get paid or be used at all. So this must be protected somehow, currently it's in the main
+        // dsee message, but I understand it'll need to get moved somewhere else.
+
 
         // 70047 and greater
+        // I'd prefer this be done using IMPLEMENT_SERIALIZE, for example see CMasternodePaymentWinner
         vRecv >> vin >> addr >> vchSig >> sigTime >> pubkey >> pubkey2 >> count >> current >> lastUpdated >> protocolVersion;
 
         // make sure signature isn't in the future (past is OK)
@@ -65,6 +98,9 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         }
 
         bool isLocal = addr.IsRFC1918() || addr.IsLocal();
+        //- Local masternodes are allowed in the list, but do not broadcast to the network. This behavior is important,
+        // because we want to be able to locally test masternodes on intranet.
+
         std::string vchPubKey(pubkey.begin(), pubkey.end());
         std::string vchPubKey2(pubkey2.begin(), pubkey2.end());
 
@@ -107,6 +143,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
 
         //search existing masternode list, this is where we update existing masternodes with new dsee broadcasts
 
+        //rather than looping through everything, could we use another structure that allows direct lookups? Is there a better way?
         BOOST_FOREACH(CMasterNode& mn, vecMasternodes) {
             if(mn.vin.prevout == vin.prevout) {
                 // count == -1 when it's a new entry
@@ -116,6 +153,8 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
                 if(count == -1 && mn.pubkey == pubkey && !mn.UpdatedWithin(MASTERNODE_MIN_DSEE_SECONDS)){
                     mn.UpdateLastSeen();
 
+                    // the behavior here is really important, if a new dsee is broadcast, we want to replace the old one on the network.
+                    // however, we don't want to allow these frequently (DOS attacks)
                     if(mn.now < sigTime){ //take the newest entry
                         LogPrintf("dsee - Got updated entry for %s\n", addr.ToString().c_str());
                         mn.pubkey2 = pubkey2;
@@ -134,6 +173,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
 
         // make sure the vout that was signed is related to the transaction that spawned the masternode
         //  - this is expensive, so it's only done once per masternode
+        // !! this should be completely avoidable and will massively improve performance by getting rid of it
         if(!darkSendSigner.IsVinAssociatedWithPubkey(vin, pubkey)) {
             LogPrintf("dsee - Got mismatched pubkey and vin\n");
             Misbehaving(pfrom->GetId(), 100);
@@ -172,6 +212,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
                 activeMasternode.EnableHotColdMasterNode(vin, addr);
             }
 
+            // if we're getting the whole list from dseg, we shouldn't broadcast it
             if(count == -1 && !isLocal)
                 RelayDarkSendElectionEntry(vin, addr, vchSig, sigTime, pubkey, pubkey2, count, current, lastUpdated, protocolVersion);
 
@@ -193,10 +234,16 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         bool fIsInitialDownload = IsInitialBlockDownload();
         if(fIsInitialDownload) return;
 
+        /*
+            DSEEPS are broadcast to the network every minute, but are ignored unless the
+            node hasn't been updated in 15 minutes. So DSEEPS are broadcast to the whole network
+            about 4 times an hour. The data they carry is pretty lite and there's only a couple thousand of them
+            so the amount of data isn't terrible.
+        */
         CTxIn vin;
-        vector<unsigned char> vchSig;
-        int64_t sigTime;
-        bool stop;
+        vector<unsigned char> vchSig; //signed with the shared key /pubkey2
+        int64_t sigTime; //time of the signature
+        bool stop; //if we should stop the node
         vRecv >> vin >> vchSig >> sigTime >> stop;
 
         //LogPrintf("dseep - Received: vin: %s sigTime: %lld stop: %s\n", vin.ToString().c_str(), sigTime, stop ? "true" : "false");
@@ -218,6 +265,8 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
             	// LogPrintf("dseep - Found corresponding mn for vin: %s\n", vin.ToString().c_str());
             	// take this only if it's newer
                 if(mn.lastDseep < sigTime){
+
+                    // all data is checked for validity here, for example "stop" could be alterned to turn off nodes you don't control.
                     std::string strMessage = mn.addr.ToString() + boost::lexical_cast<std::string>(sigTime) + boost::lexical_cast<std::string>(stop);
 
                     std::string errorMessage = "";
@@ -244,6 +293,8 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
 
         if(fDebug) LogPrintf("dseep - Couldn't find masternode entry %s\n", vin.ToString().c_str());
 
+        // When dseg fails, this is used as the backup mode for getting the masternode list. It could also be
+        // used when a node somehow misses the dsee announcement.
         std::map<COutPoint, int64_t>::iterator i = askedForMasternodeListEntry.find(vin.prevout);
         if (i != askedForMasternodeListEntry.end()){
             int64_t t = (*i).second;

@@ -2145,7 +2145,7 @@ int64_t CWallet::GetTotalValue(std::vector<CTxIn> vCoins) {
     return nTotalValue;
 }
 
-string CWallet::PrepareDarksendDenominate(int minRounds, int maxRounds)
+string CWallet::PrepareDarksendDenominate(int minRounds, int maxRounds, bool fSubmitAnonymous)
 {
     if (IsLocked())
         return _("Error: Wallet locked, unable to create transaction!");
@@ -2285,7 +2285,7 @@ string CWallet::PrepareDarksendDenominate(int minRounds, int maxRounds)
     //randomize the output order
     std::random_shuffle (vOut.begin(), vOut.end());
 
-    darkSendPool.SendDarksendDenominate(vCoins, vOut, nValueIn);
+    darkSendPool.SendDarksendDenominate(vCoins, vOut, nValueIn, fSubmitAnonymous);
 
     return "";
 }

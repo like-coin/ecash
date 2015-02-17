@@ -157,7 +157,6 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         CDarksendQueue dsq;
         vRecv >> dsq;
 
-
         CService addr;
         if(!dsq.GetAddress(addr)) return;
         if(!dsq.CheckSignature()) return;
@@ -174,8 +173,11 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
                 return;
             }
 
+            //save the relay signature info
+            darkSendPool.AddRelaySignature(dsq.vchRelaySig, dsq.nBlockHeight);
+
             if (fDebug)  LogPrintf("darksend queue is ready - %s\n", addr.ToString().c_str());
-            darkSendPool.PrepareDarksendDenominate();
+            darkSendPool.PrepareDarksendDenominate(true);
         } else {
             BOOST_FOREACH(CDarksendQueue q, vecDarksendQueue){
                 if(q.vin == dsq.vin) return;
@@ -197,29 +199,57 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
             dsq.Relay();
             dsq.time = GetTime();
         }
-    } else if (strCommand == "dsir") { //DarkSend vIn Relay
+    } else if (strCommand == "dsr") { //DarkSend Relay
         //* Ask a masternode to relay an anonymous output to another masternode *//
 
         std::string error = "";
         if (pfrom->nVersion < darkSendPool.MIN_PEER_PROTO_VERSION) {
-            LogPrintf("dsir -- incompatible version! \n");
+            LogPrintf("dsr -- incompatible version! \n");
             return;
         }
 
         if(!fMasterNode){
-            LogPrintf("dsir -- not a masternode! \n");
+            LogPrintf("dsr -- not a masternode! \n");
             return;
         }
 
         CTxIn vinMasternode;
-        CTxOut output;
+        vector<unsigned char> vchSig;
+        int nBlockHeight;
+        int nRelayType;
+        CTxIn in;
+        CTxOut out;
 
-        vRecv >> vinMasternode >> output;
+        vRecv >> vinMasternode >> vchSig >> nBlockHeight >> nRelayType >> in >> out;
+
+        if(chainActive.Tip()->nHeight - nBlockHeight > 10) return;
+        if(nRelayType != DARKSEND_RELAY_IN && 
+            nRelayType != DARKSEND_RELAY_OUT &&
+            nRelayType != DARKSEND_RELAY_SIG) return;
+        if(!in && nRelayType == DARKSEND_RELAY_IN) return;
+        if(!out && nRelayType == DARKSEND_RELAY_OUT) return;
+        if(!in && nRelayType == DARKSEND_RELAY_SIG) return;
 
         int i = GetMasternodeByVin(vinMasternode));
 
         if(i == -1){
-            LogPrintf("dsir -- unknown masternode! %s \n", vinMasternode.ToString().c_str());
+            LogPrintf("dsr -- unknown masternode! %s \n", vinMasternode.ToString().c_str());
+            return;
+        }
+
+        int a = GetMasternodeRank(activeMasternode.vin, nBlockHeight);
+
+        if(a > 20){
+            LogPrintf("dsr -- unknown/invalid masternode! %s \n", activeMasternode.vin.ToString().c_str());
+            return;
+        }
+
+        //check the signature from the target masternode
+        std::string strMessage = boost::lexical_cast<std::string>(nBlockHeight);
+        std::string errorMessage = "";
+        if(!darkSendSigner.VerifyMessage(vecMasternode[i].pubkey, vchSig, strMessage, errorMessage)){
+            LogPrintf("dsr - Got bad masternode address signature\n");
+            Misbehaving(pfrom->GetId(), 100);
             return;
         }
 
@@ -232,18 +262,17 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
             {
                 if((CNetAddr)pnode->addr != (CNetAddr)vecMasternodes[i].addr) continue;
 
-                pnode->PushMessage("dsao", output);
-                LogPrintf("dsir --- connected, sending dsao for %d - denom %d\n", sessionDenom, GetDenominationsByAmount(sessionTotalValue));
+                pnode->PushMessage("dsai", vinMasternode, vchSig, nBlockHeight, nRelayType, in, out);
+                LogPrintf("dsr --- connected, sending dsai for %d - denom %d\n", sessionDenom, GetDenominationsByAmount(sessionTotalValue));
                 return;
             }
         }
 
-    } else if (strCommand == "dsao") { //DarkSend Anonymous Output
-        //* Ask a masternode to relay an anonymous output to another masternode *//
+    } else if (strCommand == "dsai") { //DarkSend Anonymous Item (Input/Output/Sig)
 
         std::string error = "";
         if (pfrom->nVersion < darkSendPool.MIN_PEER_PROTO_VERSION) {
-            LogPrintf("dsir -- incompatible version! \n");
+            LogPrintf("dsai -- incompatible version! \n");
             error = _("Incompatible version.");
             pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
 
@@ -251,14 +280,72 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         }
 
         if(!fMasterNode){
-            LogPrintf("dsir -- not a masternode! \n");
+            LogPrintf("dsai -- not a masternode! \n");
             error = _("This is not a masternode.");
             pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
 
             return;
         }
 
-        darkSendPool.anonTx.AddOutput()
+        CTxIn vinMasternode;
+        vector<unsigned char> vchSig;
+        int nBlockHeight;
+        int nRelayType;
+        CTxIn in;
+        CTxOut out;
+
+        vRecv >> vinMasternode >> vchSig >> nBlockHeight >> nRelayType >> in >> out;
+
+        if(chainActive.Tip()->nHeight - nBlockHeight > 10) return;
+        if(nRelayType != DARKSEND_RELAY_IN && 
+            nRelayType != DARKSEND_RELAY_OUT &&
+            nRelayType != DARKSEND_RELAY_SIG) return;
+        
+        if(!in && nRelayType == DARKSEND_RELAY_IN) return;
+        if(!out && nRelayType == DARKSEND_RELAY_OUT) return;
+        if(!in && nRelayType == DARKSEND_RELAY_SIG) return;
+
+        int i = GetMasternodeByVin(vinMasternode));
+
+        if(i == -1){
+            LogPrintf("dsr -- unknown masternode! %s \n", vinMasternode.ToString().c_str());
+            return;
+        }
+
+        //check the signature from the target masternode
+        std::string strMessage = boost::lexical_cast<std::string>(nBlockHeight);
+        std::string errorMessage = "";
+        if(!darkSendSigner.VerifyMessage(vecMasternode[i].pubkey, vchSig, strMessage, errorMessage)){
+            LogPrintf("dsr - Got bad masternode address signature\n");
+            Misbehaving(pfrom->GetId(), 100);
+            return;
+        }
+
+        //do we have enough users in the current session?
+        if(!darkSendPool.IsSessionReady()){
+            LogPrintf("dsi -- session not complete! \n");
+            error = _("Session not complete!");
+            pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
+            return;
+        }
+
+        switch(nRelayType){
+        case DARKSEND_RELAY_IN:
+            darkSendPool.anonTx.AddInput(in);
+            break;
+        case DARKSEND_RELAY_OUT:
+            //do we have the same denominations as the current session?
+            if(!darkSendPool.IsCompatibleWithEntries(out))
+            {
+                return;
+            }
+
+            darkSendPool.anonTx.AddOutput(out);
+            break;
+        case DARKSEND_RELAY_SIG:
+            darkSendPool.anonTx.AddSig(in);
+            break;
+        }
 
     } else if (strCommand == "dsi") { //DarkSend vIn
         std::string error = "";
@@ -1204,7 +1291,7 @@ bool CDarkSendPool::SignaturesComplete(){
 // Execute a darksend denomination via a masternode.
 // This is only ran from clients
 //
-void CDarkSendPool::SendDarksendDenominate(std::vector<CTxIn>& vin, std::vector<CTxOut>& vout, int64_t amount){
+void CDarkSendPool::SendDarksendDenominate(std::vector<CTxIn>& vin, std::vector<CTxOut>& vout, int64_t amount, bool fSubmitAnonymous){
     if(darkSendPool.txCollateral == CTransaction()){
         LogPrintf ("CDarksendPool:SendDarksendDenominate() - Darksend collateral not set");
         return;
@@ -1272,8 +1359,13 @@ void CDarkSendPool::SendDarksendDenominate(std::vector<CTxIn>& vin, std::vector<
     e.Add(vin, amount, txCollateral, vout);
     myEntries.push_back(e);
 
-    // relay our entry to the master node
-    RelayDarkSendIn(vin, amount, txCollateral, vout);
+    if(fSubmitAnonymous) {
+        // submit inputs/outputs through relays
+
+    } else {
+        // relay our entry to the master node
+        RelayDarkSendIn(vin, amount, txCollateral, vout);
+    }
     Check();
 }
 
@@ -1715,10 +1807,10 @@ bool CDarkSendPool::DoAutomaticDenominating(bool fDryRun, bool ready)
 }
 
 
-bool CDarkSendPool::PrepareDarksendDenominate()
+bool CDarkSendPool::PrepareDarksendDenominate(bool fSubmitAnonymous)
 {
     // Submit transaction to the pool if we get here, use sessionDenom so we use the same amount of money
-    std::string strError = pwalletMain->PrepareDarksendDenominate(0, nDarksendRounds);
+    std::string strError = pwalletMain->PrepareDarksendDenominate(0, nDarksendRounds, fSubmitAnonymous);
     LogPrintf("DoAutomaticDenominating : Running darksend denominate. Return '%s'\n", strError.c_str());
 
     if(strError == "") return true;
@@ -1877,7 +1969,14 @@ bool CDarkSendPool::CreateDenominated(int64_t nTotalValue)
     return true;
 }
 
-bool CDarkSendPool::IsCompatibleWithEntries(std::vector<CTxOut> vout)
+bool CDarkSendPool::IsCompatibleWithEntries(CTxOut& out)
+{
+    std::vector<CTxOut> vOut;
+    vecOut.push_back(out);
+    return IsCompatibleWithEntries(vOut);
+}
+
+bool CDarkSendPool::IsCompatibleWithEntries(std::vector<CTxOut>& vout)
 {
     BOOST_FOREACH(const CDarkSendEntry v, entries) {
         LogPrintf(" IsCompatibleWithEntries %d %d\n", GetDenominations(vout), GetDenominations(v.vout));

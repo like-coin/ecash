@@ -23,13 +23,12 @@ class CActiveMasternode;
 #define POOL_STATUS_UNKNOWN                    0 // waiting for update
 #define POOL_STATUS_IDLE                       1 // waiting for update
 #define POOL_STATUS_QUEUE                      2 // waiting in a queue
-#define POOL_STATUS_ACCEPTING_ANON_ENTRIES     3 // accepting anonymous entries
-#define POOL_STATUS_ACCEPTING_ENTRIES          4 // accepting entries, anon mode failed, this is the backup
-#define POOL_STATUS_FINALIZE_TRANSACTION       5 // master node will broadcast what it accepted
-#define POOL_STATUS_SIGNING                    6 // check inputs/outputs, sign final tx
-#define POOL_STATUS_TRANSMISSION               7 // transmit transaction
-#define POOL_STATUS_ERROR                      8 // error
-#define POOL_STATUS_SUCCESS                    9 // success
+#define POOL_STATUS_ACCEPTING_ENTRIES          3 // accepting entries, anon mode failed, this is the backup
+#define POOL_STATUS_FINALIZE_TRANSACTION       4 // master node will broadcast what it accepted
+#define POOL_STATUS_SIGNING                    5 // check inputs/outputs, sign final tx
+#define POOL_STATUS_TRANSMISSION               6 // transmit transaction
+#define POOL_STATUS_ERROR                      7 // error
+#define POOL_STATUS_SUCCESS                    8 // success
 
 // status update message constants
 #define MASTERNODE_ACCEPTED                    1
@@ -38,6 +37,11 @@ class CActiveMasternode;
 
 #define DARKSEND_QUEUE_TIMEOUT                 120
 #define DARKSEND_SIGNING_TIMEOUT               30
+
+// used for anonymous relaying of inputs/outputs/sigs
+#define DARKSEND_RELAY_IN                 1
+#define DARKSEND_RELAY_OUT                2
+#define DARKSEND_RELAY_SIG                3
 
 extern CDarkSendPool darkSendPool;
 extern CDarkSendSigner darkSendSigner;
@@ -140,12 +144,18 @@ public:
     bool ready; //ready for submit
     std::vector<unsigned char> vchSig;
 
+    //information used for the anonymous relay system
+    int nBlockHeight;
+    std::vector<unsigned char> vchRelaySig;
+
     CDarksendQueue()
     {
         nDenom = 0;
         vin = CTxIn();
         time = 0;
         vchSig.clear();
+        vchRelaySig.clear();
+        nBlockHeight = 0;
         ready = false;
     }
 
@@ -156,6 +166,11 @@ public:
         READWRITE(time);
         READWRITE(ready);
         READWRITE(vchSig);
+
+        if(ready){
+            READWRITE(vchRelaySig);
+            READWRITE(nBlockHeight);
+        }
     )
 
     bool GetAddress(CService &addr)
@@ -283,6 +298,10 @@ public:
     //debugging data
     std::string strAutoDenomResult;
 
+    // used for securing the anonymous relay system
+    vector<unsigned char> vchMasternodeRelaySig;
+    int nMasternodeBlockHeight;
+
     //incremented whenever a DSQ comes through
     int64_t nDsqCount;
 
@@ -388,7 +407,7 @@ public:
     }
 
     // Are these outputs compatible with other client in the pool?
-    bool IsCompatibleWithEntries(std::vector<CTxOut> vout);
+    bool IsCompatibleWithEntries();
     // Is this amount compatible with other client in the pool?
     bool IsCompatibleWithSession(int64_t nAmount, CTransaction txCollateral, std::string& strReason);
 
@@ -415,6 +434,10 @@ public:
     bool AddAnonymousOutput(const CTxOut& out) {return anonTx.AddOutput(out);}
     bool AddAnonymousInput(const CTxOut& in) {return anonTx.AddInput(in);}
     bool AddAnonymousSig(const CTxOut& in) {return anonTx.AddSig(in);}
+    bool AddRelaySignature(vector<unsigned char> vchMasternodeRelaySigIn, int nMasternodeBlockHeightIn) {
+        vchMasternodeRelaySig = vchMasternodeRelaySigIn;
+        nMasternodeBlockHeight = nMasternodeBlockHeightIn;
+    }
 
     // add signature to a vin
     bool AddScriptSig(const CTxIn& newVin);

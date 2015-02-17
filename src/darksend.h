@@ -23,12 +23,13 @@ class CActiveMasternode;
 #define POOL_STATUS_UNKNOWN                    0 // waiting for update
 #define POOL_STATUS_IDLE                       1 // waiting for update
 #define POOL_STATUS_QUEUE                      2 // waiting in a queue
-#define POOL_STATUS_ACCEPTING_ENTRIES          3 // accepting entries
-#define POOL_STATUS_FINALIZE_TRANSACTION       4 // master node will broadcast what it accepted
-#define POOL_STATUS_SIGNING                    5 // check inputs/outputs, sign final tx
-#define POOL_STATUS_TRANSMISSION               6 // transmit transaction
-#define POOL_STATUS_ERROR                      7 // error
-#define POOL_STATUS_SUCCESS                    8 // success
+#define POOL_STATUS_ACCEPTING_ANON_ENTRIES     3 // accepting anonymous entries
+#define POOL_STATUS_ACCEPTING_ENTRIES          4 // accepting entries, anon mode failed, this is the backup
+#define POOL_STATUS_FINALIZE_TRANSACTION       5 // master node will broadcast what it accepted
+#define POOL_STATUS_SIGNING                    6 // check inputs/outputs, sign final tx
+#define POOL_STATUS_TRANSMISSION               7 // transmit transaction
+#define POOL_STATUS_ERROR                      8 // error
+#define POOL_STATUS_SUCCESS                    9 // success
 
 // status update message constants
 #define MASTERNODE_ACCEPTED                    1
@@ -67,6 +68,7 @@ public:
 };
 
 // A clients transaction in the darksend pool
+// -- holds the input/output mapping for each user in the pool
 class CDarkSendEntry
 {
 public:
@@ -124,6 +126,7 @@ public:
         return (GetTime() - addedTime) > DARKSEND_QUEUE_TIMEOUT;// 120 seconds
     }
 };
+
 
 //
 // A currently inprogress darksend merge and denomination information
@@ -211,9 +214,19 @@ public:
     bool VerifyMessage(CPubKey pubkey, std::vector<unsigned char>& vchSig, std::string strMessage, std::string& errorMessage);
 };
 
-class CDarksendSession
+//
+// Build a transaction anonymously
+//
+class CDSAnonTx
 {
+public:
+    std::vector<CTxIn> vin;
+    std::vector<CTxOut> vout;
 
+    bool IsTransactionValid();
+    bool AddOutput(const CTxOut out);
+    bool AddInput(const CTxIn in);
+    bool AddSig(const CTxOut in);
 };
 
 //
@@ -230,6 +243,8 @@ public:
     std::vector<CDarkSendEntry> entries;
     // the finalized transaction ready for signing
     CTransaction finalTransaction;
+    // anonymous outputs
+    CDSAnonTx anonTx;
 
     int64_t lastTimeChanged;
     int64_t lastAutoDenomination;
@@ -395,6 +410,12 @@ public:
     bool IsCollateralValid(const CTransaction& txCollateral);
     // add a clients entry to the pool
     bool AddEntry(const std::vector<CTxIn>& newInput, const int64_t& nAmount, const CTransaction& txCollateral, const std::vector<CTxOut>& newOutput, std::string& error);
+
+    // add an anonymous output/inputs/sig
+    bool AddAnonymousOutput(const CTxOut& out) {return anonTx.AddOutput(out);}
+    bool AddAnonymousInput(const CTxOut& in) {return anonTx.AddInput(in);}
+    bool AddAnonymousSig(const CTxOut& in) {return anonTx.AddSig(in);}
+
     // add signature to a vin
     bool AddScriptSig(const CTxIn& newVin);
     // are all inputs signed?

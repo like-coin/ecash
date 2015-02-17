@@ -197,6 +197,68 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
             dsq.Relay();
             dsq.time = GetTime();
         }
+    } else if (strCommand == "dsir") { //DarkSend vIn Relay
+        //* Ask a masternode to relay an anonymous output to another masternode *//
+
+        std::string error = "";
+        if (pfrom->nVersion < darkSendPool.MIN_PEER_PROTO_VERSION) {
+            LogPrintf("dsir -- incompatible version! \n");
+            return;
+        }
+
+        if(!fMasterNode){
+            LogPrintf("dsir -- not a masternode! \n");
+            return;
+        }
+
+        CTxIn vinMasternode;
+        CTxOut output;
+
+        vRecv >> vinMasternode >> output;
+
+        int i = GetMasternodeByVin(vinMasternode));
+
+        if(i == -1){
+            LogPrintf("dsir -- unknown masternode! %s \n", vinMasternode.ToString().c_str());
+            return;
+        }
+
+        //connect and deliver the message
+        if(ConnectNode((CAddress)vecMasternodes[i].addr, NULL, true)){
+            submittedToMasternode = vecMasternodes[i].addr;
+
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes)
+            {
+                if((CNetAddr)pnode->addr != (CNetAddr)vecMasternodes[i].addr) continue;
+
+                pnode->PushMessage("dsao", output);
+                LogPrintf("dsir --- connected, sending dsao for %d - denom %d\n", sessionDenom, GetDenominationsByAmount(sessionTotalValue));
+                return;
+            }
+        }
+
+    } else if (strCommand == "dsao") { //DarkSend Anonymous Output
+        //* Ask a masternode to relay an anonymous output to another masternode *//
+
+        std::string error = "";
+        if (pfrom->nVersion < darkSendPool.MIN_PEER_PROTO_VERSION) {
+            LogPrintf("dsir -- incompatible version! \n");
+            error = _("Incompatible version.");
+            pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
+
+            return;
+        }
+
+        if(!fMasterNode){
+            LogPrintf("dsir -- not a masternode! \n");
+            error = _("This is not a masternode.");
+            pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
+
+            return;
+        }
+
+        darkSendPool.anonTx.AddOutput()
 
     } else if (strCommand == "dsi") { //DarkSend vIn
         std::string error = "";
@@ -1090,6 +1152,7 @@ bool CDarkSendPool::AddEntry(const std::vector<CTxIn>& newInput, const int64_t& 
 
 bool CDarkSendPool::AddScriptSig(const CTxIn& newVin){
     if(fDebug) LogPrintf("CDarkSendPool::AddScriptSig -- new sig  %s\n", newVin.scriptSig.ToString().substr(0,24).c_str());
+
 
     BOOST_FOREACH(const CDarkSendEntry v, entries) {
         BOOST_FOREACH(const CDarkSendEntryVin s, v.sev){
@@ -2135,6 +2198,36 @@ bool CDarksendQueue::CheckSignature()
     return false;
 }
 
+bool CDSAnonTx::AddOutput(const CTxOut out){
+    if(fDebug) LogPrintf("CDSAnonTx::AddOutput -- new  %s\n", out.ToString().substr(0,24).c_str());
+
+    //already have this output
+    if(std::find(vOut.begin(), vOut.end(), out) != vOut.end()) return true;
+
+    vOut.push_back(out);
+}
+
+bool CDSAnonTx::AddInput(const CTxIn in){
+    if(fDebug) LogPrintf("CDSAnonTx::AddInput -- new  %s\n", in.ToString().substr(0,24).c_str());
+
+    //already have this output
+    if(std::find(vIn.begin(), vIn.end(), out) != vIn.end()) return true;
+
+    vIn.push_back(in);
+}
+
+bool CDSAnonTx::AddSig(const CTxIn newIn){
+    if(fDebug) LogPrintf("CDSAnonTx::AddSig -- new  %s\n", in.ToString().substr(0,24).c_str());
+
+
+    BOOST_FOREACH(CTxIn in, vin){
+        if(in.prevout == newIn.prevout){
+            in.scriptSig = newIn.scriptSig;
+            return true;
+        }
+    }
+    return false;
+}
 
 //TODO: Rename/move to core
 void ThreadCheckDarkSendPool()

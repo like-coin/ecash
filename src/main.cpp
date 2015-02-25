@@ -3907,6 +3907,8 @@ bool static AlreadyHave(const CInv& inv)
         return mapSporks.count(inv.hash);
     case MSG_MASTERNODE_WINNER:
         return mapSeenMasternodeVotes.count(inv.hash);
+    case MSG_MASTERNODE_DSEE:
+    case MSG_MASTERNODE_DSEEP:
     }
     // Don't know what it is, just say we already got one
     return true;

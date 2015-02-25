@@ -20,6 +20,10 @@ std::map<CNetAddr, int64_t> askedForMasternodeList;
 std::map<COutPoint, int64_t> askedForMasternodeListEntry;
 // cache block hashes as we calculate them
 std::map<int64_t, uint256> mapCacheBlockHashes;
+// keep track of dsee messages
+map<uint256, CMasterNodeAnnounce> mapMasternodeAnnounce;
+// keep track of dseep messages
+map<uint256, CMasterNodePing> mapMasternodePing;
 
 // manage the masternode connections
 void ProcessMasternodeConnections(){

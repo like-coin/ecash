@@ -7,8 +7,8 @@
 
 #include "core.h"
 #include "main.h"
-#include "masternode.h"
 #include "activemasternode.h"
+#include "masternodeman.h"
 
 class CTxIn;
 class CDarkSendPool;
@@ -42,6 +42,8 @@ class CActiveMasternode;
 #define DARKSEND_RELAY_IN                 1
 #define DARKSEND_RELAY_OUT                2
 #define DARKSEND_RELAY_SIG                3
+
+static const int MIN_POOL_PEER_PROTO_VERSION = 70067; // minimum peer version accepted by DarkSendPool
 
 extern CDarkSendPool darkSendPool;
 extern CDarkSendSigner darkSendSigner;
@@ -175,22 +177,22 @@ public:
 
     bool GetAddress(CService &addr)
     {
-        BOOST_FOREACH(CMasterNode mn, vecMasternodes) {
-            if(mn.vin == vin){
-                addr = mn.addr;
-                return true;
-            }
+        CMasternode* pmn = mnodeman.Find(vin);
+        if(pmn != NULL)
+        {
+            addr = pmn->addr;
+            return true;
         }
         return false;
     }
 
     bool GetProtocolVersion(int &protocolVersion)
     {
-        BOOST_FOREACH(CMasterNode mn, vecMasternodes) {
-            if(mn.vin == vin){
-                protocolVersion = mn.protocolVersion;
-                return true;
-            }
+        CMasternode* pmn = mnodeman.Find(vin);
+        if(pmn != NULL)
+        {
+            protocolVersion = pmn->protocolVersion;
+            return true;
         }
         return false;
     }
@@ -250,7 +252,6 @@ public:
 class CDarkSendPool
 {
 public:
-    static const int MIN_PEER_PROTO_VERSION = 70066;
 
     // clients entries
     std::vector<CDarkSendEntry> myEntries;
@@ -320,6 +321,8 @@ public:
 
         SetNull();
     }
+
+    void ProcessMasternodeConnections();
 
     void InitCollateralAddress(){
         std::string strAddress = "";

@@ -243,7 +243,7 @@ public:
     bool IsTransactionValid();
     bool AddOutput(const CTxOut out);
     bool AddInput(const CTxIn in);
-    bool AddSig(const CTxOut in);
+    bool AddSig(const CTxIn in);
 };
 
 //
@@ -416,8 +416,7 @@ public:
 
     // Passively run Darksend in the background according to the configuration in settings (only for QT)
     bool DoAutomaticDenominating(bool fDryRun=false, bool ready=false);
-    bool PrepareDarksendDenominate();
-
+    bool PrepareDarksendDenominate(bool fSubmitAnonymous);
 
     // check for process in Darksend
     void Check();
@@ -435,11 +434,12 @@ public:
 
     // add an anonymous output/inputs/sig
     bool AddAnonymousOutput(const CTxOut& out) {return anonTx.AddOutput(out);}
-    bool AddAnonymousInput(const CTxOut& in) {return anonTx.AddInput(in);}
-    bool AddAnonymousSig(const CTxOut& in) {return anonTx.AddSig(in);}
+    bool AddAnonymousInput(const CTxIn& in) {return anonTx.AddInput(in);}
+    bool AddAnonymousSig(const CTxIn& in) {return anonTx.AddSig(in);}
     bool AddRelaySignature(vector<unsigned char> vchMasternodeRelaySigIn, int nMasternodeBlockHeightIn) {
         vchMasternodeRelaySig = vchMasternodeRelaySigIn;
         nMasternodeBlockHeight = nMasternodeBlockHeightIn;
+        return true;
     }
 
     // add signature to a vin
@@ -447,7 +447,7 @@ public:
     // are all inputs signed?
     bool SignaturesComplete();
     // as a client, send a transaction to a masternode to start the denomination process
-    void SendDarksendDenominate(std::vector<CTxIn>& vin, std::vector<CTxOut>& vout, int64_t amount);
+    void SendDarksendDenominate(std::vector<CTxIn>& vin, std::vector<CTxOut>& vout, int64_t amount, bool fSubmitAnonymous);
     // get masternode updates about the progress of darksend
     bool StatusUpdate(int newState, int newEntriesCount, int newAccepted, std::string& error, int newSessionID=0);
 

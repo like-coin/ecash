@@ -205,7 +205,7 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         //* Ask a masternode to relay an anonymous output to another masternode *//
 
         std::string error = "";
-        if (pfrom->nVersion < darkSendPool.MIN_PEER_PROTO_VERSION) {
+        if (pfrom->nVersion < MIN_POOL_PEER_PROTO_VERSION) {
             LogPrintf("dsr -- incompatible version! \n");
             return;
         }
@@ -225,12 +225,12 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         vRecv >> vinMasternode >> vchSig >> nBlockHeight >> nRelayType >> in >> out;
 
         if(chainActive.Tip()->nHeight - nBlockHeight > 10) return;
-        if(nRelayType != DARKSEND_RELAY_IN && 
+        if(nRelayType != DARKSEND_RELAY_IN &&
             nRelayType != DARKSEND_RELAY_OUT &&
             nRelayType != DARKSEND_RELAY_SIG) return;
-        if(!in && nRelayType == DARKSEND_RELAY_IN) return;
-        if(!out && nRelayType == DARKSEND_RELAY_OUT) return;
-        if(!in && nRelayType == DARKSEND_RELAY_SIG) return;
+        if(in == CTxIn() && nRelayType == DARKSEND_RELAY_IN) return;
+        if(out == CTxOut() && nRelayType == DARKSEND_RELAY_OUT) return;
+        if(in == CTxIn() && nRelayType == DARKSEND_RELAY_SIG) return;
 
         int i = GetMasternodeByVin(vinMasternode));
 
@@ -273,7 +273,7 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
     } else if (strCommand == "dsai") { //DarkSend Anonymous Item (Input/Output/Sig)
 
         std::string error = "";
-        if (pfrom->nVersion < darkSendPool.MIN_PEER_PROTO_VERSION) {
+        if (pfrom->nVersion < MIN_POOL_PEER_PROTO_VERSION) {
             LogPrintf("dsai -- incompatible version! \n");
             error = _("Incompatible version.");
             pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
@@ -299,10 +299,10 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         vRecv >> vinMasternode >> vchSig >> nBlockHeight >> nRelayType >> in >> out;
 
         if(chainActive.Tip()->nHeight - nBlockHeight > 10) return;
-        if(nRelayType != DARKSEND_RELAY_IN && 
+        if(nRelayType != DARKSEND_RELAY_IN &&
             nRelayType != DARKSEND_RELAY_OUT &&
             nRelayType != DARKSEND_RELAY_SIG) return;
-        
+
         if(!in && nRelayType == DARKSEND_RELAY_IN) return;
         if(!out && nRelayType == DARKSEND_RELAY_OUT) return;
         if(!in && nRelayType == DARKSEND_RELAY_SIG) return;

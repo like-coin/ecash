@@ -104,24 +104,24 @@ Release Process
     e2e403e1a08869c7eed4d4293bce13d51ec6a63592918b90ae215a0eceb44cb4  protobuf-win32-2.5.0-gitian-r4.zip
     a0999037e8b0ef9ade13efd88fee261ba401f5ca910068b7e0cd3262ba667db0  protobuf-win64-2.5.0-gitian-r4.zip
 
- Build darkcoind and darkcoin-qt on Linux32, Linux64, and Win32:
+ Build ecashd and ecash-qt on Linux32, Linux64, and Win32:
 
-	./bin/gbuild --commit darkcoin=v${VERSION} ../darkcoin/contrib/gitian-descriptors/gitian-linux.yml
-	./bin/gsign --signer $SIGNER --release ${VERSION} --destination ../gitian.sigs/ ../darkcoin/contrib/gitian-descriptors/gitian-linux.yml
+	./bin/gbuild --commit ecash=v${VERSION} ../ecash/contrib/gitian-descriptors/gitian-linux.yml
+	./bin/gsign --signer $SIGNER --release ${VERSION} --destination ../gitian.sigs/ ../ecash/contrib/gitian-descriptors/gitian-linux.yml
 	pushd build/out
-	zip -r darkcoin-${VERSION}-linux-gitian.zip *
-	mv darkcoin-${VERSION}-linux-gitian.zip ../../../
+	zip -r ecash-${VERSION}-linux-gitian.zip *
+	mv ecash-${VERSION}-linux-gitian.zip ../../../
 	popd
-	./bin/gbuild --commit darkcoin=v${VERSION} ../darkcoin/contrib/gitian-descriptors/gitian-win.yml
-	./bin/gsign --signer $SIGNER --release ${VERSION}-win --destination ../gitian.sigs/ ../darkcoin/contrib/gitian-descriptors/gitian-win.yml
+	./bin/gbuild --commit ecash=v${VERSION} ../ecash/contrib/gitian-descriptors/gitian-win.yml
+	./bin/gsign --signer $SIGNER --release ${VERSION}-win --destination ../gitian.sigs/ ../ecash/contrib/gitian-descriptors/gitian-win.yml
 	pushd build/out
-	zip -r darkcoin-${VERSION}-win-gitian.zip *
-	mv darkcoin-${VERSION}-win-gitian.zip ../../../
+	zip -r ecash-${VERSION}-win-gitian.zip *
+	mv ecash-${VERSION}-win-gitian.zip ../../../
 	popd
-    ./bin/gbuild --commit darkcoin=v${VERSION} ../darkcoin/contrib/gitian-descriptors/gitian-osx-bitcoin.yml
+    ./bin/gbuild --commit ecash=v${VERSION} ../ecash/contrib/gitian-descriptors/gitian-osx-bitcoin.yml
     ./bin/gsign --signer $SIGNER --release ${VERSION}-osx --destination ../gitian.sigs/ ../bitcoin/contrib/gitian-descriptors/gitian-osx-bitcoin.yml
 	pushd build/out
-	mv Darkcoin-Qt.dmg ../../../
+	mv Ecash-Qt.dmg ../../../
 	popd
 	popd
 

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Ecash
+Comment=Ecash P2P Cryptocurrency
+Comment[fr]=Ecash, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=Ecash, eşten eşe kriptografik sanal para birimi
+Exec=ecash-qt %u
+Terminal=false
+Type=Application
+Icon=ecash128
+MimeType=x-scheme-handler/ecash;
+Categories=Office;Finance;

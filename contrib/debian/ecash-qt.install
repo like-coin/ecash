@@ -1,0 +1,6 @@
+usr/local/bin/ecash-qt usr/bin
+share/pixmaps/ecash32.xpm usr/share/pixmaps
+share/pixmaps/ecash16.xpm usr/share/pixmaps
+share/pixmaps/ecash128.png usr/share/pixmaps
+debian/ecash-qt.desktop usr/share/applications
+debian/ecash-qt.protocol usr/share/kde4/services/

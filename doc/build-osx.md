@@ -1,6 +1,6 @@
 Mac OS X Build Instructions and Notes
 ====================================
-This guide will show you how to build darkcoind(headless client) for OSX.
+This guide will show you how to build ecashd(headless client) for OSX.
 
 Notes
 -----
@@ -73,19 +73,19 @@ These rest of these commands are run inside brew interactive mode:
 /private/tmp/berkeley-db4-UGpd0O $ exit
 ```
 
-After exiting, you'll get a warning that the install is keg-only, which means it wasn't symlinked to `/usr/local`.  You don't need it to link it to build darkcoin, but if you want to, here's how:
+After exiting, you'll get a warning that the install is keg-only, which means it wasn't symlinked to `/usr/local`.  You don't need it to link it to build ecash, but if you want to, here's how:
 
     $ brew --force link berkeley-db4
 
 
-### Building `darkcoind`
+### Building `ecashd`
 
 1. Clone the github tree to get the source code and go into the directory.
 
-        git clone https://github.com/darkcoin/darkcoin.git
-        cd darkcoin
+        git clone https://github.com/ecash/ecash.git
+        cd ecash
 
-2.  Build darkcoind:
+2.  Build ecashd:
 
         ./autogen.sh
         ./configure
@@ -97,11 +97,11 @@ After exiting, you'll get a warning that the install is keg-only, which means it
 
 Creating a release build
 ------------------------
-You can ignore this section if you are building `darkcoind` for your own use.
+You can ignore this section if you are building `ecashd` for your own use.
 
-darkcoind/darkcoin-cli binaries are not included in the Bitcoin-Qt.app bundle.
+ecashd/ecash-cli binaries are not included in the Bitcoin-Qt.app bundle.
 
-If you are building `darkcoind` or `Bitcoin-Qt` for others, your build machine should be set up
+If you are building `ecashd` or `Bitcoin-Qt` for others, your build machine should be set up
 as follows for maximum compatibility:
 
 All dependencies should be compiled with these flags:
@@ -116,23 +116,23 @@ bundle is packaged and signed to create the .dmg disk image that is distributed.
 Running
 -------
 
-It's now available at `./darkcoind`, provided that you are still in the `src`
+It's now available at `./ecashd`, provided that you are still in the `src`
 directory. We have to first create the RPC configuration file, though.
 
-Run `./darkcoind` to get the filename where it should be put, or just try these
+Run `./ecashd` to get the filename where it should be put, or just try these
 commands:
 
-    echo -e "rpcuser=darkcoinrpc\nrpcpassword=$(xxd -l 16 -p /dev/urandom)" > "/Users/${USER}/Library/Application Support/Darkcoin/darkcoin.conf"
-    chmod 600 "/Users/${USER}/Library/Application Support/Darkcoin/darkcoin.conf"
+    echo -e "rpcuser=ecashrpc\nrpcpassword=$(xxd -l 16 -p /dev/urandom)" > "/Users/${USER}/Library/Application Support/Ecash/ecash.conf"
+    chmod 600 "/Users/${USER}/Library/Application Support/Ecash/ecash.conf"
 
 When next you run it, it will start downloading the blockchain, but it won't
 output anything while it's doing this. This process may take several hours;
 you can monitor its process by looking at the debug.log file, like this:
 
-    tail -f $HOME/Library/Application\ Support/Darkcoin/debug.log
+    tail -f $HOME/Library/Application\ Support/Ecash/debug.log
 
 Other commands:
 
-    ./darkcoind -daemon # to start the darkcoin daemon.
-    ./darkcoin-cli --help  # for a list of command-line options.
-    ./darkcoin-cli help    # When the daemon is running, to get a list of RPC commands
+    ./ecashd -daemon # to start the ecash daemon.
+    ./ecash-cli --help  # for a list of command-line options.
+    ./ecash-cli help    # When the daemon is running, to get a list of RPC commands

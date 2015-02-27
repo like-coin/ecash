@@ -1,8 +1,8 @@
 [main]
 host = https://www.transifex.com
 
-[darkcoin.tx]
-file_filter = src/qt/locale/darkcoin_<lang>.ts
-source_file = src/qt/locale/darkcoin_en.ts
+[ecash.tx]
+file_filter = src/qt/locale/ecash_<lang>.ts
+source_file = src/qt/locale/ecash_en.ts
 source_lang = en
 type = QT

@@ -2307,7 +2307,7 @@ bool CDSAnonTx::AddOutput(const CTxOut out){
 bool CDSAnonTx::AddInput(const CTxIn in){
     if(fDebug) LogPrintf("CDSAnonTx::AddInput -- new  %s\n", in.ToString().substr(0,24).c_str());
 
-    //already have this output
+    //already have this input
     if(std::find(vin.begin(), vin.end(), in) != vin.end()) return false;
 
     vin.push_back(in);
@@ -2317,7 +2317,6 @@ bool CDSAnonTx::AddInput(const CTxIn in){
 
 bool CDSAnonTx::AddSig(const CTxIn newIn){
     if(fDebug) LogPrintf("CDSAnonTx::AddSig -- new  %s\n", newIn.ToString().substr(0,24).c_str());
-
 
     BOOST_FOREACH(CTxIn in, vin){
         if(in.prevout == newIn.prevout){

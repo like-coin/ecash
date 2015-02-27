@@ -259,7 +259,7 @@ public:
     std::vector<CDarkSendEntry> entries;
     // the finalized transaction ready for signing
     CTransaction finalTransaction;
-    // anonymous outputs
+    // anonymous inputs/outputs
     CDSAnonTx anonTx;
 
     int64_t lastTimeChanged;

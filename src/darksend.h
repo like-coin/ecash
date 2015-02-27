@@ -410,7 +410,8 @@ public:
     }
 
     // Are these outputs compatible with other client in the pool?
-    bool IsCompatibleWithEntries();
+    bool IsCompatibleWithEntries(std::vector<CTxOut>& vout);
+
     // Is this amount compatible with other client in the pool?
     bool IsCompatibleWithSession(int64_t nAmount, CTransaction txCollateral, std::string& strReason);
 

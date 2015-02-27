@@ -490,9 +490,9 @@ bool CConsensusVote::SignatureValid()
         return false;
     }
 
-    //LogPrintf("verify addr %s \n", vecMasternodes[0].addr.ToString().c_str());
-    //LogPrintf("verify addr %s \n", vecMasternodes[1].addr.ToString().c_str());
-    //LogPrintf("verify addr %d %s \n", n, vecMasternodes[n].addr.ToString().c_str());
+    //LogPrintf("verify addr %s \n", vMasternodes[0].addr.ToString().c_str());
+    //LogPrintf("verify addr %s \n", vMasternodes[1].addr.ToString().c_str());
+    //LogPrintf("verify addr %d %s \n", n, vMasternodes[n].addr.ToString().c_str());
 
     CScript pubkey;
     pubkey.SetDestination(pmn->pubkey2.GetID());

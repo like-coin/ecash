@@ -232,14 +232,14 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         if(out == CTxOut() && nRelayType == DARKSEND_RELAY_OUT) return;
         if(in == CTxIn() && nRelayType == DARKSEND_RELAY_SIG) return;
 
-        int i = GetMasternodeByVin(vinMasternode));
 
-        if(i == -1){
+        CMasternode* pmn = mnodeman.Find(vinMasternode);
+        if(!pmn){
             LogPrintf("dsr -- unknown masternode! %s \n", vinMasternode.ToString().c_str());
             return;
         }
 
-        int a = GetMasternodeRank(activeMasternode.vin, nBlockHeight);
+        int a = mnodeman.GetMasternodeRank(activeMasternode.vin, nBlockHeight);
 
         if(a > 20){
             LogPrintf("dsr -- unknown/invalid masternode! %s \n", activeMasternode.vin.ToString().c_str());
@@ -249,23 +249,21 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         //check the signature from the target masternode
         std::string strMessage = boost::lexical_cast<std::string>(nBlockHeight);
         std::string errorMessage = "";
-        if(!darkSendSigner.VerifyMessage(vecMasternode[i].pubkey, vchSig, strMessage, errorMessage)){
+        if(!darkSendSigner.VerifyMessage(pmn->pubkey, vchSig, strMessage, errorMessage)){
             LogPrintf("dsr - Got bad masternode address signature\n");
             Misbehaving(pfrom->GetId(), 100);
             return;
         }
 
         //connect and deliver the message
-        if(ConnectNode((CAddress)vecMasternodes[i].addr, NULL, true)){
-            submittedToMasternode = vecMasternodes[i].addr;
+        if(ConnectNode((CAddress)pmn->addr, NULL, true)){
 
             LOCK(cs_vNodes);
             BOOST_FOREACH(CNode* pnode, vNodes)
             {
-                if((CNetAddr)pnode->addr != (CNetAddr)vecMasternodes[i].addr) continue;
+                if((CNetAddr)pnode->addr != (CNetAddr)pmn->addr) continue;
 
                 pnode->PushMessage("dsai", vinMasternode, vchSig, nBlockHeight, nRelayType, in, out);
-                LogPrintf("dsr --- connected, sending dsai for %d - denom %d\n", sessionDenom, GetDenominationsByAmount(sessionTotalValue));
                 return;
             }
         }
@@ -275,17 +273,11 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         std::string error = "";
         if (pfrom->nVersion < MIN_POOL_PEER_PROTO_VERSION) {
             LogPrintf("dsai -- incompatible version! \n");
-            error = _("Incompatible version.");
-            pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
-
             return;
         }
 
         if(!fMasterNode){
             LogPrintf("dsai -- not a masternode! \n");
-            error = _("This is not a masternode.");
-            pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
-
             return;
         }
 
@@ -303,13 +295,13 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
             nRelayType != DARKSEND_RELAY_OUT &&
             nRelayType != DARKSEND_RELAY_SIG) return;
 
-        if(!in && nRelayType == DARKSEND_RELAY_IN) return;
-        if(!out && nRelayType == DARKSEND_RELAY_OUT) return;
-        if(!in && nRelayType == DARKSEND_RELAY_SIG) return;
+        if(in == CTxIn() && nRelayType == DARKSEND_RELAY_IN) return;
+        if(out == CTxOut() && nRelayType == DARKSEND_RELAY_OUT) return;
+        if(in == CTxIn() && nRelayType == DARKSEND_RELAY_SIG) return;
 
-        int i = GetMasternodeByVin(vinMasternode));
 
-        if(i == -1){
+        CMasternode* pmn = mnodeman.Find(vinMasternode);
+        if(!pmn){
             LogPrintf("dsr -- unknown masternode! %s \n", vinMasternode.ToString().c_str());
             return;
         }
@@ -317,7 +309,7 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         //check the signature from the target masternode
         std::string strMessage = boost::lexical_cast<std::string>(nBlockHeight);
         std::string errorMessage = "";
-        if(!darkSendSigner.VerifyMessage(vecMasternode[i].pubkey, vchSig, strMessage, errorMessage)){
+        if(!darkSendSigner.VerifyMessage(pmn->pubkey, vchSig, strMessage, errorMessage)){
             LogPrintf("dsr - Got bad masternode address signature\n");
             Misbehaving(pfrom->GetId(), 100);
             return;
@@ -326,8 +318,6 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
         //do we have enough users in the current session?
         if(!darkSendPool.IsSessionReady()){
             LogPrintf("dsi -- session not complete! \n");
-            error = _("Session not complete!");
-            pfrom->PushMessage("dssu", darkSendPool.sessionID, darkSendPool.GetState(), darkSendPool.GetEntriesCount(), MASTERNODE_REJECTED, error);
             return;
         }
 
@@ -336,12 +326,6 @@ void ProcessMessageDarksend(CNode* pfrom, std::string& strCommand, CDataStream& 
             darkSendPool.anonTx.AddInput(in);
             break;
         case DARKSEND_RELAY_OUT:
-            //do we have the same denominations as the current session?
-            if(!darkSendPool.IsCompatibleWithEntries(out))
-            {
-                return;
-            }
-
             darkSendPool.anonTx.AddOutput(out);
             break;
         case DARKSEND_RELAY_SIG:
@@ -1988,13 +1972,6 @@ bool CDarkSendPool::CreateDenominated(int64_t nTotalValue)
     return true;
 }
 
-bool CDarkSendPool::IsCompatibleWithEntries(CTxOut& out)
-{
-    std::vector<CTxOut> vOut;
-    vecOut.push_back(out);
-    return IsCompatibleWithEntries(vOut);
-}
-
 bool CDarkSendPool::IsCompatibleWithEntries(std::vector<CTxOut>& vout)
 {
     BOOST_FOREACH(const CDarkSendEntry v, entries) {
@@ -2320,22 +2297,26 @@ bool CDSAnonTx::AddOutput(const CTxOut out){
     if(fDebug) LogPrintf("CDSAnonTx::AddOutput -- new  %s\n", out.ToString().substr(0,24).c_str());
 
     //already have this output
-    if(std::find(vOut.begin(), vOut.end(), out) != vOut.end()) return true;
+    if(std::find(vout.begin(), vout.end(), out) != vout.end()) return false;
 
-    vOut.push_back(out);
+    vout.push_back(out);
+
+    return true;
 }
 
 bool CDSAnonTx::AddInput(const CTxIn in){
     if(fDebug) LogPrintf("CDSAnonTx::AddInput -- new  %s\n", in.ToString().substr(0,24).c_str());
 
     //already have this output
-    if(std::find(vIn.begin(), vIn.end(), out) != vIn.end()) return true;
+    if(std::find(vin.begin(), vin.end(), in) != vin.end()) return false;
 
-    vIn.push_back(in);
+    vin.push_back(in);
+
+    return true;
 }
 
 bool CDSAnonTx::AddSig(const CTxIn newIn){
-    if(fDebug) LogPrintf("CDSAnonTx::AddSig -- new  %s\n", in.ToString().substr(0,24).c_str());
+    if(fDebug) LogPrintf("CDSAnonTx::AddSig -- new  %s\n", newIn.ToString().substr(0,24).c_str());
 
 
     BOOST_FOREACH(CTxIn in, vin){

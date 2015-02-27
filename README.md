@@ -5,7 +5,9 @@ http://www.ecash.io
 
 Copyright (c) 2009-2015 Bitcoin Core Developers
 
-Copyright (c) 2014-2015 Ecash Core Developers
+Copyright (c) 2014-2015 Darkcoin Core Developers
+
+Copyright (c) 2015- Ecash Core Developers
 
 
 What is Ecash?

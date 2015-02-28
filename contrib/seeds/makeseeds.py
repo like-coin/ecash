@@ -3,7 +3,7 @@
 # Generate pnSeed[] from Pieter's DNS seeder
 #
 
-NSEEDS=600
+NSEEDS=0
 
 import re
 import sys
